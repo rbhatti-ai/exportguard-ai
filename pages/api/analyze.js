@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+
 // pages/api/analyze.js
 
 export const config = {
@@ -53,6 +55,23 @@ async function callOcrService(fileBuffer) {
     };
   }
 
+  // For now, just return empty values; real Document AI call comes later
+  return {
+    ocrText: '',
+    ocrHsCode: null,
+    ocrValueCAD: null,
+  };
+}
+
+async function callOcrService(fileBuffer) {
+  if (!fileBuffer) {
+    return {
+      ocrText: '',
+      ocrHsCode: null,
+      ocrValueCAD: null,
+    };
+  }
+
   // Placeholder only: replace with a real OCR/customs‑extraction API.
   // Example of what a real call might look like:
   //
@@ -87,6 +106,7 @@ export default async function handler(req, res) {
 
   try {
     const { fields, file } = await parseMultipartForm(req);
+const { ocrText, ocrHsCode, ocrValueCAD } = await callOcrService(file);
 
     // Inputs from user
     const typedValue = fields.valueCAD ? Number(fields.valueCAD) : null;
