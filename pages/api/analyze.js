@@ -45,15 +45,14 @@ async function parseMultipartForm(req) {
   return { fields, file };
 }
 
-// --- Helper: call external OCR/AI service (placeholder) ---
-
-
+// --- Helper: call Google Document AI Invoice processor ---
 async function callOcrService(fileBuffer) {
   if (!fileBuffer) {
     return {
       ocrText: '',
       ocrHsCode: null,
-      ocrValueCAD: null,
+      ocrValue: null,       // raw invoice total
+      ocrCurrency: null,    // invoice currency if we can detect it
     };
   }
 
@@ -61,7 +60,7 @@ async function callOcrService(fileBuffer) {
     const saKeyRaw = process.env.GOOGLE_DOC_AI_KEY;
     if (!saKeyRaw) {
       console.error('GOOGLE_DOC_AI_KEY env var not set');
-      return { ocrText: '', ocrHsCode: null, ocrValueCAD: null };
+      return { ocrText: '', ocrHsCode: null, ocrValue: null, ocrCurrency: null };
     }
 
     const saKey = JSON.parse(saKeyRaw);
@@ -93,7 +92,7 @@ async function callOcrService(fileBuffer) {
 
     if (!oauthRes.ok) {
       console.error('OAuth error status:', oauthRes.status, await oauthRes.text());
-      return { ocrText: '', ocrHsCode: null, ocrValueCAD: null };
+      return { ocrText: '', ocrHsCode: null, ocrValue: null, ocrCurrency: null };
     }
 
     const { access_token: accessToken } = await oauthRes.json();
@@ -121,25 +120,40 @@ async function callOcrService(fileBuffer) {
 
     if (!docAiRes.ok) {
       console.error('DocAI error status:', docAiRes.status, await docAiRes.text());
-      return { ocrText: '', ocrHsCode: null, ocrValueCAD: null };
+      return { ocrText: '', ocrHsCode: null, ocrValue: null, ocrCurrency: null };
     }
 
     const doc = await docAiRes.json();
-console.log(
-  'DocAI entities:',
-  JSON.stringify(doc.document?.entities?.slice(0, 20) || [], null, 2)
-);
+
+    // Optional debugging: first few entities
+    console.log(
+      'DocAI entities:',
+      JSON.stringify(doc.document?.entities?.slice(0, 20) || [], null, 2)
+    );
 
     const text = doc.document?.text || '';
     let total = null;
+    let currency = null;
 
     const entities = doc.document?.entities || [];
     for (const e of entities) {
       const t = (e.type || '').toLowerCase();
-      if (t.includes('total_amount') || t.includes('invoice_total')) {
-        const n = Number(e.normalizedValue?.moneyValue?.amount || e.mentionText);
+
+      // Heuristic: pick invoice total
+      if (t.includes('total_amount') || t.includes('invoice_total') || t === 'total') {
+        const money = e.normalizedValue?.moneyValue;
+        if (money) {
+          const n = Number(money.amount);
+          if (!Number.isNaN(n)) {
+            total = n;
+            currency = money.currencyCode || null;
+            break;
+          }
+        }
+        const n = Number(e.mentionText);
         if (!Number.isNaN(n)) {
           total = n;
+          // currency may still be null; we handle that downstream
           break;
         }
       }
@@ -147,19 +161,49 @@ console.log(
 
     return {
       ocrText: text,
-      ocrHsCode: null,   // invoice model doesn’t return HS code yet
-      ocrValueCAD: total,
+      ocrHsCode: null,     // invoice model doesn’t return HS code yet
+      ocrValue: total,     // raw invoice total in invoice currency
+      ocrCurrency: currency || null,
     };
   } catch (err) {
     console.error('OCR service exception:', err);
     return {
       ocrText: '',
       ocrHsCode: null,
-      ocrValueCAD: null,
+      ocrValue: null,
+      ocrCurrency: null,
     };
   }
 }
 
+// --- Helper: very simple currency → CAD converter (stub) ---
+// For now this only handles USD→CAD at a fixed demo rate.
+// Later replace with Bank of Canada / CBSA FX API.
+async function convertToCAD(amount, currency) {
+  if (amount == null || Number.isNaN(Number(amount))) {
+    return { valueCAD: 0, fxNote: 'No amount to convert' };
+  }
+
+  const cur = (currency || 'CAD').toUpperCase();
+
+  if (cur === 'CAD') {
+    return { valueCAD: Number(amount), fxNote: 'Already in CAD' };
+  }
+
+  if (cur === 'USD') {
+    const rate = 1.35; // demo rate
+    return {
+      valueCAD: Number(amount) * rate,
+      fxNote: `Demo FX: ${cur}→CAD at ${rate}`,
+    };
+  }
+
+  // Fallback: treat as CAD if unknown
+  return {
+    valueCAD: Number(amount),
+    fxNote: `Unknown FX for ${cur}; treated as CAD`,
+  };
+}
 
 // --- Main handler: parse form → OCR → CBSA logic ---
 export default async function handler(req, res) {
@@ -170,23 +214,32 @@ export default async function handler(req, res) {
   try {
     const { fields, file } = await parseMultipartForm(req);
 
-
-
-
     // Inputs from user
     const typedValue = fields.valueCAD ? Number(fields.valueCAD) : null;
+    const typedCurrency = (fields.currency || 'CAD').trim();
     const destination = (fields.destination || '').trim() || 'Unknown';
     const mode = (fields.mode || 'Air').trim(); // Air / Rail / Truck / Ocean
 
-    // Call OCR / AI extraction (placeholder)
-    const { ocrText, ocrHsCode, ocrValueCAD } = await callOcrService(file);
+    // Call OCR / AI extraction
+    const { ocrText, ocrHsCode, ocrValue, ocrCurrency } = await callOcrService(file);
 
-    // Decide which value to use
-    const valueCAD = typedValue != null && !Number.isNaN(typedValue)
-      ? typedValue
-      : ocrValueCAD != null
-      ? Number(ocrValueCAD)
-      : 0;
+    // Decide which value + currency to use
+    let sourceAmount = null;
+    let sourceCurrency = 'CAD';
+
+    if (typedValue != null && !Number.isNaN(typedValue)) {
+      sourceAmount = typedValue;
+      sourceCurrency = typedCurrency || 'CAD';
+    } else if (ocrValue != null && !Number.isNaN(Number(ocrValue))) {
+      sourceAmount = Number(ocrValue);
+      // If Document AI gave a currency, use it; otherwise assume USD for demo.
+      sourceCurrency = ocrCurrency || 'USD';
+    } else {
+      sourceAmount = 0;
+      sourceCurrency = 'CAD';
+    }
+
+    const { valueCAD, fxNote } = await convertToCAD(sourceAmount, sourceCurrency);
 
     const hsCode = ocrHsCode || '8479.89.00';
 
@@ -243,9 +296,15 @@ export default async function handler(req, res) {
       issues,
       ocrMeta: {
         usedOcrValue: typedValue == null,
-        ocrValueCAD,
+        ocrValue,
+        ocrCurrency,
         ocrHsCode,
         ocrTextSnippet: ocrText ? ocrText.slice(0, 200) : '',
+      },
+      valueSource: {
+        sourceAmount,
+        sourceCurrency,
+        fxNote,
       },
     });
   } catch (err) {
