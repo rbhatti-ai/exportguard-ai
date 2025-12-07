@@ -16,9 +16,9 @@ export default function Home() {
 
     try {
       const formData = new FormData();
-          formData.append('valueCAD', window.exportguard_valueCAD || '');
-    formData.append('destination', window.exportguard_destination || '');
-
+      formData.append('valueCAD', window.exportguard_valueCAD || '');
+      formData.append('destination', window.exportguard_destination || '');
+      formData.append('mode', window.exportguard_mode || 'Air');
       formData.append('invoice', file);
 
       const res = await fetch('/api/analyze', {
@@ -40,7 +40,14 @@ export default function Home() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', fontFamily: 'system-ui, sans-serif', padding: '40px', background: '#f3f4f6' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        fontFamily: 'system-ui, sans-serif',
+        padding: '40px',
+        background: '#f3f4f6',
+      }}
+    >
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <h1 style={{ fontSize: 34, fontWeight: 800, marginBottom: 8 }}>ExportGuard AI</h1>
         <p style={{ marginBottom: 24, color: '#4b5563' }}>
@@ -50,7 +57,12 @@ export default function Home() {
         {!result && (
           <form
             onSubmit={handleUpload}
-            style={{ background: '#ffffff', padding: 32, borderRadius: 16, boxShadow: '0 10px 25px rgba(15,23,42,0.08)' }}
+            style={{
+              background: '#ffffff',
+              padding: 32,
+              borderRadius: 16,
+              boxShadow: '0 10px 25px rgba(15,23,42,0.08)',
+            }}
           >
             <div
               style={{
@@ -97,39 +109,7 @@ export default function Home() {
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={!file || analyzing}
-              style={{
-                width: '100%',
-                padding: '14px 18px',
-                background: analyzing ? '#9ca3af' : '#16a34a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 999,
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: !file || analyzing ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {analyzing ? 'Analyzing invoice…' : 'Analyze CBSA compliance'}
-            </button>
-
-            {error && (
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: 12,
-                  borderRadius: 8,
-                  background: '#fef2f2',
-                  color: '#b91c1c',
-                  fontSize: 14,
-                }}
-              >
-                {error}
-              </div>
-            )}
-                          <div style={{ marginTop: 24, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ marginTop: 24, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <div>
                 <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
                   Declared value (CAD)
@@ -167,8 +147,64 @@ export default function Home() {
                   placeholder="Mexico"
                 />
               </div>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                  Mode of transport
+                </label>
+                <select
+                  name="mode"
+                  defaultValue="Air"
+                  onChange={(e) => (window.exportguard_mode = e.target.value)}
+                  style={{
+                    marginTop: 6,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #d1d5db',
+                    width: 180,
+                    backgroundColor: '#ffffff',
+                  }}
+                >
+                  <option value="Air">Air</option>
+                  <option value="Rail">Rail</option>
+                  <option value="Truck">Truck</option>
+                  <option value="Ocean">Ocean</option>
+                </select>
+              </div>
             </div>
 
+            <button
+              type="submit"
+              disabled={!file || analyzing}
+              style={{
+                width: '100%',
+                marginTop: 24,
+                padding: '14px 18px',
+                background: analyzing ? '#9ca3af' : '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 999,
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: !file || analyzing ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {analyzing ? 'Analyzing invoice…' : 'Analyze CBSA compliance'}
+            </button>
+
+            {error && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: 12,
+                  borderRadius: 8,
+                  background: '#fef2f2',
+                  color: '#b91c1c',
+                  fontSize: 14,
+                }}
+              >
+                {error}
+              </div>
+            )}
           </form>
         )}
 
@@ -195,6 +231,8 @@ export default function Home() {
                   Value (CAD): <strong>{result.valueCAD ?? 'n/a'}</strong>
                   <br />
                   Destination: <strong>{result.destination || 'n/a'}</strong>
+                  <br />
+                  Mode: <strong>{result.mode || 'n/a'}</strong>
                 </div>
               </div>
               <div style={{ flex: 1, minWidth: 260 }}>
