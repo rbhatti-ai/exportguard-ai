@@ -18,6 +18,8 @@ export default function Home() {
       const formData = new FormData();
       formData.append('valueCAD', window.exportguard_valueCAD || '');
       formData.append('destination', window.exportguard_destination || '');
+      formData.append('origin', window.exportguard_origin || '');
+      formData.append('currency', window.exportguard_currency || 'CAD');
       formData.append('mode', window.exportguard_mode || 'Air');
       formData.append('invoice', file);
 
@@ -42,38 +44,39 @@ export default function Home() {
   const getSummary = () => {
     if (!result) return null;
 
-    const cersIssue = (result.issues || []).find((i) =>
-      i.title.toLowerCase().includes('cers declaration')
-    );
-    const cersRequired = cersIssue
-      ? !cersIssue.title.toLowerCase().includes('not required')
-      : false;
-
     return {
-      cersRequired,
-      porRequired: true,
+      cersRequired: !!result.cersRequired,
+      porRequired: !!result.porRequired,
       permitChecked: false,
       cersSource:
-        'CBSA export reporting thresholds (CERS guidance, CBSA export documentation rules).',
-      porSource: 'CBSA export documentation requirements for Proof-of-Report (POR#).',
+        'CBSA Exporters’ guide to reporting and Memorandum D20-1-1 (commercial goods valued at CAD 2,000 or more; US vs non-US destinations).',
+      porSource:
+        'CBSA exporter reporting and CERS guides describing Proof-of-Report (POR#) on commercial documents.',
     };
   };
 
   const summary = getSummary();
 
+  const openLink = (url) => {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
     <div
       style={{
         minHeight: '100vh',
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
         padding: '40px',
         background: '#f3f4f6',
       }}
     >
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <h1 style={{ fontSize: 34, fontWeight: 800, marginBottom: 8 }}>ExportGuard AI</h1>
         <p style={{ marginBottom: 24, color: '#4b5563' }}>
-          Upload a commercial invoice image or PDF and get an instant CBSA compliance analysis.
+          Upload a commercial invoice image or PDF and get an instant CBSA export-compliance view
+          based on CERS thresholds, POR# expectations, and origin data.
         </p>
 
         {!result && (
@@ -86,6 +89,7 @@ export default function Home() {
               boxShadow: '0 10px 25px rgba(15,23,42,0.08)',
             }}
           >
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>1. Upload invoice</h2>
             <div
               style={{
                 border: '2px dashed #d1d5db',
@@ -106,7 +110,7 @@ export default function Home() {
               <label htmlFor="upload" style={{ cursor: 'pointer' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
                 <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
-                  Drag & drop invoice, or click to choose
+                  Drag &amp; drop invoice, or click to choose
                 </div>
                 <div style={{ color: '#6b7280', marginBottom: 16 }}>
                   PDF, JPG, JPEG, PNG, HEIC up to 25 MB
@@ -131,26 +135,46 @@ export default function Home() {
               )}
             </div>
 
-            <div style={{ marginTop: 24, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>2. Shipment details</h2>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <div>
                 <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
-                  Declared value (CAD)
+                  Declared value
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  name="valueCAD"
-                  onChange={(e) => (window.exportguard_valueCAD = e.target.value)}
-                  style={{
-                    marginTop: 6,
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1px solid #d1d5db',
-                    width: 180,
-                  }}
-                  placeholder="8500"
-                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <select
+                    name="currency"
+                    defaultValue="CAD"
+                    onChange={(e) => (window.exportguard_currency = e.target.value)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#ffffff',
+                    }}
+                  >
+                    <option value="CAD">CAD</option>
+                    <option value="USD">USD</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    name="valueCAD"
+                    onChange={(e) => (window.exportguard_valueCAD = e.target.value)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: '1px solid #d1d5db',
+                      width: 140,
+                    }}
+                    placeholder="1350"
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  Leave blank to let ExportGuard read the total from the invoice automatically.
+                </div>
               </div>
+
               <div>
                 <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
                   Destination country
@@ -166,9 +190,32 @@ export default function Home() {
                     border: '1px solid #d1d5db',
                     width: 220,
                   }}
-                  placeholder="Mexico"
+                  placeholder="United States, Mexico, Germany…"
+                />
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  CBSA CERS rules differ for shipments to the United States vs other destinations.
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                  Country of origin
+                </label>
+                <input
+                  type="text"
+                  name="origin"
+                  onChange={(e) => (window.exportguard_origin = e.target.value)}
+                  style={{
+                    marginTop: 6,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #d1d5db',
+                    width: 200,
+                  }}
+                  placeholder="Canada, USA, China…"
                 />
               </div>
+
               <div>
                 <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
                   Mode of transport
@@ -257,13 +304,14 @@ export default function Home() {
                 <strong>CBSA summary:</strong>{' '}
                 CERS:{' '}
                 <strong>{summary.cersRequired ? 'Required' : 'Not required (demo logic)'}</strong>{' '}
-                · POR#: <strong>Required</strong> · Export permit:{' '}
-                <strong>Not checked in this demo</strong>
+                · POR#:{' '}
+                <strong>{summary.porRequired ? 'Required' : 'Not required (demo logic)'}</strong>{' '}
+                · Export permit: <strong>Not checked in this demo</strong>
                 <br />
                 <span style={{ fontSize: 12, color: '#4b5563' }}>
-                  Based on CBSA export reporting thresholds and export documentation expectations
-                  for commercial goods in Canada (CERS guidance and POR# usage in CBSA export
-                  programs).
+                  Based on CBSA Exporters’ guide to reporting, CERS user guides and Memorandum
+                  D20-1-1 on exporter reporting thresholds. This is guidance only and does not
+                  replace advice from CBSA or a licensed customs broker.
                 </span>
               </div>
             )}
@@ -281,28 +329,139 @@ export default function Home() {
                   <br />
                   Destination: <strong>{result.destination || 'n/a'}</strong>
                   <br />
+                  Origin: <strong>{result.origin || 'n/a'}</strong>
+                  <br />
                   Mode: <strong>{result.mode || 'n/a'}</strong>
                 </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 260 }}>
-                {(result.issues || []).map((issue, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      background: '#fef2f2',
-                      borderLeft: '4px solid #dc2626',
-                      padding: 10,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      fontSize: 14,
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: '#b91c1c' }}>{issue.title}</div>
-                    {issue.citation && (
-                      <div style={{ color: '#7f1d1d', marginTop: 2 }}>{issue.citation}</div>
-                    )}
+                {result.valueSource && (
+                  <div style={{ marginTop: 12, fontSize: 12, color: '#6b7280' }}>
+                    <div>
+                      Source value:{' '}
+                      <strong>
+                        {result.valueSource.sourceAmount ?? 'n/a'}{' '}
+                        {result.valueSource.sourceCurrency || ''}
+                      </strong>
+                    </div>
+                    <div>FX note: {result.valueSource.fxNote}</div>
                   </div>
-                ))}
+                )}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 260 }}>
+                {(result.issues || []).map((issue, i) => {
+                  const titleLower = (issue.title || '').toLowerCase();
+                  const isCers = titleLower.includes('cers');
+                  const isPor = titleLower.includes('proof-of-report');
+                  const isOrigin = titleLower.includes('country of origin');
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        background: '#fef2f2',
+                        borderLeft: '4px solid #dc2626',
+                        padding: 10,
+                        borderRadius: 8,
+                        marginBottom: 10,
+                        fontSize: 14,
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: '#b91c1c' }}>{issue.title}</div>
+                      {issue.citation && (
+                        <div style={{ color: '#7f1d1d', marginTop: 2 }}>{issue.citation}</div>
+                      )}
+
+                      {/* Sources & links */}
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#7f1d1d' }}>
+                        <strong>Sources &amp; next steps:</strong>
+                        <br />
+                        {isCers && (
+                          <>
+                            • Review CBSA{' '}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openLink(
+                                  'https://www.cbsa-asfc.gc.ca/services/export/guide-eng.html'
+                                )
+                              }
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#1d4ed8',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              Exporters’ guide to reporting
+                            </button>{' '}
+                            and{' '}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openLink(
+                                  'https://www.cbsa-asfc.gc.ca/publications/dm-md/d20/d20-1-1-eng.html'
+                                )
+                              }
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#1d4ed8',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              Memorandum D20-1-1 (Exporter Reporting)
+                            </button>
+                            .
+                            <br />
+                            • File an export declaration in the{' '}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openLink(
+                                  'https://www.cbsa-asfc.gc.ca/services/export/portal-portail/menu-eng.html'
+                                )
+                              }
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#1d4ed8',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              CERS portal
+                            </button>{' '}
+                            if your goods are not exempt. [web:298][web:300][web:339]
+                          </>
+                        )}
+
+                        {isPor && (
+                          <>
+                            • After filing in CERS, record the Proof-of-Report number (POR#) on this
+                            invoice or related documents for carriers and audit.
+                            <br />
+                            • See POR# usage in CBSA exporter guidance and CERS user guides. [web:298][web:300]
+                          </>
+                        )}
+
+                        {isOrigin && (
+                          <>
+                            • Add the country of origin for each product line on the commercial
+                            invoice.
+                            <br />
+                            • Refer to CBSA’s origin and certificates guidance and CERS data
+                            elements. [web:298][web:316][web:303]
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
