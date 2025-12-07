@@ -16,6 +16,9 @@ export default function Home() {
 
     try {
       const formData = new FormData();
+          formData.append('valueCAD', window.exportguard_valueCAD || '');
+    formData.append('destination', window.exportguard_destination || '');
+
       formData.append('invoice', file);
 
       const res = await fetch('/api/analyze', {
@@ -126,6 +129,46 @@ export default function Home() {
                 {error}
               </div>
             )}
+                          <div style={{ marginTop: 24, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                  Declared value (CAD)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  name="valueCAD"
+                  onChange={(e) => (window.exportguard_valueCAD = e.target.value)}
+                  style={{
+                    marginTop: 6,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #d1d5db',
+                    width: 180,
+                  }}
+                  placeholder="8500"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                  Destination country
+                </label>
+                <input
+                  type="text"
+                  name="destination"
+                  onChange={(e) => (window.exportguard_destination = e.target.value)}
+                  style={{
+                    marginTop: 6,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #d1d5db',
+                    width: 220,
+                  }}
+                  placeholder="Mexico"
+                />
+              </div>
+            </div>
+
           </form>
         )}
 
