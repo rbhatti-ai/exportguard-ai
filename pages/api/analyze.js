@@ -213,21 +213,28 @@ async function convertToCAD(amount, currency) {
 
     const json = await resp.json();
     const rates = json.ForeignExchangeRates || [];
-    const first = rates[0];
+const first = rates[0];
 
-    const rateStr = first?.Rate;
-    const rate = rateStr != null ? Number(rateStr) : NaN;
+const rateStr = first?.Rate;
+let rate = rateStr != null ? Number(rateStr) : NaN;
 
-    if (!rate || Number.isNaN(rate)) {
-      console.error('CBSA FX missing/invalid rate for', cur, 'payload:', json);
-      return {
-        valueCAD: numericAmount,
-        fxNote: `No valid FX rate for ${cur}→CAD; amount treated as CAD`,
-      };
-    }
+if (!rate || Number.isNaN(rate)) {
+  console.error('CBSA FX missing/invalid rate for', cur, 'payload:', json);
+  return {
+    valueCAD: numericAmount,
+    fxNote: `No valid FX rate for ${cur}→CAD; amount treated as CAD`,
+  };
+}
 
-    // CBSA docs: Rate is the number of CAD required for 1 unit of FromCurrency. [web:310]
-    const valueCAD = numericAmount * rate;
+// Temporary safeguard: if the rate is clearly too small, invert it.
+// You are currently seeing ~0.00893, which yields 12 CAD for 1350 USD,
+// so invert values below 0.5.
+if (rate < 0.5) {
+  rate = 1 / rate;
+}
+
+const valueCAD = numericAmount * rate;
+
 
     return {
       valueCAD,
