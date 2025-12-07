@@ -190,12 +190,13 @@ export default function handler(req, res) {
     doc.fontSize(8).font('Helvetica');
 
     const references = [
-      'CBSA Memorandum D20-1-1: Exporter Reporting (https://www.cbsa-asfc.gc.ca/publications/dm-md/d20/d20-1-1-eng.html)',
-      'CBSA Exporters' Guide to Reporting (https://www.cbsa-asfc.gc.ca/services/export/guide-eng.html)',
-      'Canadian Export Reporting System (CERS) User Guide (https://www.cbsa-asfc.gc.ca/services/export/cers-guide-scde-eng.html)',
-      'CBSA Goods That Do Not Need an Export Declaration (https://www.cbsa-asfc.gc.ca/services/export/ndr-adr-eng.html)',
-      'Global Affairs Canada - Export Control List (https://www.international.gc.ca/controls-controles/)',
-    ];
+  'CBSA Memorandum D20-1-1: Exporter Reporting (https://www.cbsa-asfc.gc.ca/publications/dm-md/d20/d20-1-1-eng.html)',
+  "CBSA Exporters' Guide to Reporting (https://www.cbsa-asfc.gc.ca/services/export/guide-eng.html)",
+  'Canadian Export Reporting System (CERS) User Guide (https://www.cbsa-asfc.gc.ca/services/export/cers-guide-scde-eng.html)',
+  'CBSA Goods That Do Not Need an Export Declaration (https://www.cbsa-asfc.gc.ca/services/export/ndr-adr-eng.html)',
+  'Global Affairs Canada - Export Control List (https://www.international.gc.ca/controls-controles/)',
+];
+
 
     references.forEach((ref, idx) => {
       doc.text(`[${idx + 1}] ${ref}`, { width: 460 });
