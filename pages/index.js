@@ -575,6 +575,41 @@ export default function Home() {
               >
                 Analyze another invoice
               </button>
+               <div
+  style={{
+    marginTop: 16,
+    paddingTop: 12,
+    borderTop: '1px solid #e5e7eb',
+    fontSize: 12,
+    color: '#6b7280',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  }}
+>
+  <span>Help improve ExportGuard for Canadian exporters.</span>
+  <button
+    type="button"
+    onClick={() =>
+      openLink('https://forms.gle/YOUR_EXPORTGUARD_FEEDBACK_ID')
+    }
+    style={{
+      border: 'none',
+      background: '#111827',
+      color: '#f9fafb',
+      padding: '6px 14px',
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 500,
+      cursor: 'pointer',
+    }}
+  >
+    Share feedback (2–3 minutes)
+  </button>
+</div>
+   
             </section>
           )}
         </main>
