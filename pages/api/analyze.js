@@ -158,3 +158,87 @@ export default async function handler(req, res) {
 
   try {
     const { fields, file } = await parseMultipartForm(req);
+// --- Main handler: parse form → OCR → CBSA logic ---
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { fields, file } = await parseMultipartForm(req);
+
+    const typedValue = fields.valueCAD ? Number(fields.valueCAD) : null;
+    const destination = (fields.destination || '').trim() || 'Unknown';
+    const mode = (fields.mode || 'Air').trim(); // Air / Rail / Truck / Ocean
+
+    const { ocrText, ocrHsCode, ocrValueCAD } = await callOcrService(file);
+
+    const valueCAD =
+      typedValue != null && !Number.isNaN(typedValue)
+        ? typedValue
+        : ocrValueCAD != null
+        ? Number(ocrValueCAD)
+        : 0;
+
+    const hsCode = ocrHsCode || '8479.89.00';
+
+    const issues = [];
+    let complianceScore = 100;
+
+    const cersThreshold = 2000;
+
+    const cersRequired =
+      valueCAD >= cersThreshold ||
+      mode === 'Air' ||
+      mode === 'Rail';
+
+    if (cersRequired) {
+      issues.push({
+        title: 'CERS declaration required',
+        citation: `Declared value ${valueCAD.toFixed(
+          2
+        )} CAD and mode ${mode} trigger CBSA electronic export reporting (simplified CERS guidance).`,
+      });
+      complianceScore -= 10;
+    } else {
+      issues.push({
+        title: 'CERS declaration not required (demo logic)',
+        citation: `Value below ${cersThreshold} CAD and mode ${mode} do not trigger CERS in this simplified checker based on CBSA export reporting thresholds.`,
+      });
+    }
+
+    issues.push({
+      title: 'Proof-of-Report (POR#) missing on invoice',
+      citation:
+        'POR# should appear on commercial documentation used for export reporting under CBSA export programs.',
+    });
+    complianceScore -= 8;
+
+    issues.push({
+      title: 'Country of origin field not detected',
+      citation:
+        'Commercial invoices should state the country of origin for each line item to support CBSA export and partner customs requirements.',
+    });
+    complianceScore -= 10;
+
+    if (complianceScore < 0) complianceScore = 0;
+
+    return res.status(200).json({
+      hsCode,
+      valueCAD,
+      destination,
+      mode,
+      complianceScore,
+      issues,
+      ocrMeta: {
+        usedOcrValue: typedValue == null,
+        ocrValueCAD,
+        ocrHsCode,
+        ocrTextSnippet: ocrText ? ocrText.slice(0, 200) : '',
+      },
+    });
+  } catch (err) {
+    console.error('Analyze error:', err);
+    return res.status(500).json({ error: 'Internal server error in analyzer' });
+  }
+}
