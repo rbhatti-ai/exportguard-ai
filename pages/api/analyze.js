@@ -157,14 +157,6 @@ async function callOcrService(fileBuffer) {
 }
 
 
-  // For now, return a fixed demo response so the rest of the pipeline works.
-  return {
-    ocrText: 'Demo OCR result – invoice text not yet parsed.',
-    ocrHsCode: '8479.89.00',
-    ocrValueCAD: 8500,
-  };
-}
-
 // --- Main handler: parse form → OCR → CBSA logic ---
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
