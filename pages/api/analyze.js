@@ -218,6 +218,7 @@ export default async function handler(req, res) {
     const typedValue = fields.valueCAD ? Number(fields.valueCAD) : null;
     const typedCurrency = (fields.currency || 'CAD').trim();
     const destination = (fields.destination || '').trim() || 'Unknown';
+    const origin = (fields.origin || '').trim();
     const mode = (fields.mode || 'Air').trim(); // Air / Rail / Truck / Ocean
 
     // Call OCR / AI extraction
@@ -249,41 +250,53 @@ export default async function handler(req, res) {
 
     const cersThreshold = 2000;
 
+    const isUS =
+      destination.toUpperCase() === 'UNITED STATES' ||
+      destination.toUpperCase() === 'US' ||
+      destination.toUpperCase() === 'USA';
+
     const cersRequired =
-      valueCAD >= cersThreshold ||
-      mode === 'Air' ||
-      mode === 'Rail';
+      !isUS &&
+      (valueCAD >= cersThreshold ||
+        mode === 'Air' ||
+        mode === 'Rail');
+
+    const porRequired = cersRequired;
 
     if (cersRequired) {
       issues.push({
         title: 'CERS declaration required',
         citation: `Declared value ${valueCAD.toFixed(
           2
-        )} CAD and mode ${mode} trigger CBSA electronic export reporting (CERS guidance for commercial exports).`,
+        )} CAD and mode ${mode} to a non-US destination trigger CBSA electronic export reporting (CERS guidance for commercial exports).`,
       });
       complianceScore -= 10;
     } else {
       issues.push({
         title: 'CERS declaration not required (demo logic)',
-        citation: `Value below ${cersThreshold} CAD and mode ${mode} do not trigger CERS in this simplified checker based on CBSA export reporting thresholds.`,
+        citation: `Value below ${cersThreshold} CAD or shipment to the United States does not trigger CERS in this simplified checker based on CBSA export reporting thresholds.`,
       });
     }
 
-    // POR# expectation
-    issues.push({
-      title: 'Proof-of-Report (POR#) missing on invoice',
-      citation:
-        'POR# should appear on commercial documentation used for export reporting under CBSA export programs.',
-    });
-    complianceScore -= 8;
+    // POR# expectation – only when CERS is required
+    if (porRequired) {
+      issues.push({
+        title: 'Proof-of-Report (POR#) missing on invoice',
+        citation:
+          'When an export declaration is filed in CERS, the resulting Proof-of-Report number (POR#) should appear on commercial documentation used for export reporting under CBSA export programs.',
+      });
+      complianceScore -= 8;
+    }
 
-    // Country of origin expectation
-    issues.push({
-      title: 'Country of origin field not detected',
-      citation:
-        'Commercial invoices should state the country of origin for each line item to support CBSA export and partner customs requirements.',
-    });
-    complianceScore -= 10;
+    // Country of origin expectation – only when origin not provided
+    if (!origin) {
+      issues.push({
+        title: 'Country of origin field not detected',
+        citation:
+          'CBSA and partner customs agencies expect the country of origin for each line item to appear on commercial invoices and export declarations, including CERS filings.',
+      });
+      complianceScore -= 10;
+    }
 
     if (complianceScore < 0) complianceScore = 0;
 
@@ -291,7 +304,10 @@ export default async function handler(req, res) {
       hsCode,
       valueCAD,
       destination,
+      origin,
       mode,
+      cersRequired,
+      porRequired,
       complianceScore,
       issues,
       ocrMeta: {
