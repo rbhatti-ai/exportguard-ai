@@ -397,7 +397,14 @@ export default function Home() {
                   <strong>
                     {summary.porRequired ? 'Required' : 'Not required (demo logic)'}
                   </strong>{' '}
-                  · Export permit: <strong>Not checked in this demo</strong>
+                  · Export permit: <strong><li>
+  Export permits are <strong>not assessed by this version of ExportGuard</strong> and are
+  <strong>not included in this service tier</strong>. If you believe your goods may require
+  an export permit or export‑controls review, please contact us at{' '}
+  <a href="mailto:ask@rajbir.guru">ask@rajbir.guru</a> and we’ll be happy to work with you
+  on a dedicated permit/compliance review.
+</li>
+</strong>
                   <br />
                   <span style={{ fontSize: 11, color: '#4b5563' }}>
                     Guidance only, based on CBSA Exporters’ guide to reporting, CERS user guides and
