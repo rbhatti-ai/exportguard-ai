@@ -575,6 +575,46 @@ export default function Home() {
               >
                 Analyze another invoice
               </button>
+                  <button
+  onClick={async () => {
+    try {
+      const pdfRes = await fetch('/api/export-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+      });
+
+      if (!pdfRes.ok) throw new Error('PDF generation failed');
+
+      const blob = await pdfRes.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ExportGuard-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Could not download PDF: ' + err.message);
+    }
+  }}
+  style={{
+    marginTop: 10,
+    marginLeft: 0,
+    padding: '9px 18px',
+    borderRadius: 999,
+    border: 'none',
+    background: '#111827',
+    color: '#f9fafb',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600,
+  }}
+>
+  📄 Download CBSA Report (PDF)
+</button>
+
                <div
   style={{
     marginTop: 16,
