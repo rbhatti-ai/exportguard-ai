@@ -176,34 +176,72 @@ async function callOcrService(fileBuffer) {
   }
 }
 
-// --- Helper: very simple currency → CAD converter (stub) ---
-// For now this only handles USD→CAD at a fixed demo rate.
-// Later replace with Bank of Canada / CBSA FX API.
+// --- Helper: currency → CAD converter using CBSA FX API (simplified) ---
+// NOTE: In production, you should cache results server-side to avoid
+// hitting the API on every request.
 async function convertToCAD(amount, currency) {
   if (amount == null || Number.isNaN(Number(amount))) {
     return { valueCAD: 0, fxNote: 'No amount to convert' };
   }
 
   const cur = (currency || 'CAD').toUpperCase();
+  const numericAmount = Number(amount);
 
   if (cur === 'CAD') {
-    return { valueCAD: Number(amount), fxNote: 'Already in CAD' };
+    return { valueCAD: numericAmount, fxNote: 'Already in CAD' };
   }
 
-  if (cur === 'USD') {
-    const rate = 1.35; // demo rate
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const url =
+      `https://bcd-api-dca-ipa.cbsa-asfc.cloud-nuage.canada.ca/` +
+      `exchange-rate-lambda/exchange-rates` +
+      `?fromCurrency=${encodeURIComponent(cur)}` +
+      `&toCurrency=CAD` +
+      `&startDate=${today}&endDate=${today}&limit=1`;
+
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error('CBSA FX error status:', resp.status, await resp.text());
+      // Fallback: treat as CAD if we cannot fetch a rate
+      return {
+        valueCAD: numericAmount,
+        fxNote: `FX API failed for ${cur}→CAD; amount treated as CAD`,
+      };
+    }
+
+    const json = await resp.json();
+    const rates = json.ForeignExchangeRates || [];
+    const first = rates[0];
+
+    const rateStr = first?.Rate;
+    const rate = rateStr != null ? Number(rateStr) : NaN;
+
+    if (!rate || Number.isNaN(rate)) {
+      console.error('CBSA FX missing/invalid rate for', cur, 'payload:', json);
+      return {
+        valueCAD: numericAmount,
+        fxNote: `No valid FX rate for ${cur}→CAD; amount treated as CAD`,
+      };
+    }
+
+    // CBSA docs: Rate is the number of CAD required for 1 unit of FromCurrency. [web:310]
+    const valueCAD = numericAmount * rate;
+
     return {
-      valueCAD: Number(amount) * rate,
-      fxNote: `Demo FX: ${cur}→CAD at ${rate}`,
+      valueCAD,
+      fxNote: `CBSA FX: ${cur}→CAD at rate ${rate}`,
+    };
+  } catch (err) {
+    console.error('CBSA FX exception:', err);
+    return {
+      valueCAD: numericAmount,
+      fxNote: `FX exception for ${cur}→CAD; amount treated as CAD`,
     };
   }
-
-  // Fallback: treat as CAD if unknown
-  return {
-    valueCAD: Number(amount),
-    fxNote: `Unknown FX for ${cur}; treated as CAD`,
-  };
 }
+
 
 // --- Main handler: parse form → OCR → CBSA logic ---
 export default async function handler(req, res) {
