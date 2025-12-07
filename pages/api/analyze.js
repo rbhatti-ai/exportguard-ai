@@ -1,6 +1,5 @@
 // pages/api/analyze.js
 import jwt from 'jsonwebtoken';
-
 export const config = {
   api: {
     bodyParser: false,
