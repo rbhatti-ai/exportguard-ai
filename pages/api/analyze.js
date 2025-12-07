@@ -40,31 +40,42 @@ export default async function handler(req, res) {
 
   const valueCAD = Number(fields.valueCAD || 0);
   const destination = (fields.destination || '').trim() || 'Unknown';
+  const mode = (fields.mode || 'Air').trim(); // Air / Rail / Truck / Ocean
 
-  // Simple CBSA logic (demo)
   const issues = [];
   let complianceScore = 100;
 
   const cersThreshold = 2000;
-  const mode = 'Air';
 
-  if (valueCAD >= cersThreshold || ['Air', 'Rail'].includes(mode)) {
+  const cersRequired =
+    valueCAD >= cersThreshold ||
+    mode === 'Air' ||
+    mode === 'Rail';
+
+  if (cersRequired) {
     issues.push({
       title: 'CERS declaration required',
-      citation: `Value ${valueCAD.toFixed(2)} CAD and mode ${mode} trigger CERS reporting threshold.`,
+      citation: `Declared value ${valueCAD.toFixed(
+        2
+      )} CAD and mode ${mode} trigger CBSA electronic export reporting.`,
     });
     complianceScore -= 10;
+  } else {
+    issues.push({
+      title: 'CERS declaration not required (demo logic)',
+      citation: `Value below ${cersThreshold} CAD and mode ${mode} do not trigger CERS in this simplified checker.`,
+    });
   }
 
   issues.push({
     title: 'Proof-of-Report (POR#) missing on invoice',
-    citation: 'POR# must appear on export documentation.',
+    citation: 'POR# should appear on commercial documentation used for export reporting.',
   });
   complianceScore -= 8;
 
   issues.push({
     title: 'Country of origin field not detected',
-    citation: 'Commercial invoices should state country of origin.',
+    citation: 'Commercial invoices should state the country of origin for each line item.',
   });
   complianceScore -= 10;
 
@@ -74,6 +85,7 @@ export default async function handler(req, res) {
     hsCode: '8479.89.00',
     valueCAD,
     destination,
+    mode,
     complianceScore,
     issues,
   });
