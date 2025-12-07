@@ -39,6 +39,28 @@ export default function Home() {
     }
   };
 
+  // Derive simple summary flags from issues
+  const getSummary = () => {
+    if (!result) return null;
+
+    const cersIssue = (result.issues || []).find((i) =>
+      i.title.toLowerCase().includes('cers declaration')
+    );
+    const cersRequired = cersIssue
+      ? !cersIssue.title.toLowerCase().includes('not required')
+      : false;
+
+    return {
+      cersRequired,
+      porRequired: true,
+      permitChecked: false,
+      cersSource: 'CBSA export reporting thresholds (CERS guidance, CBSA export documentation rules).',
+      porSource: 'CBSA export documentation requirements for Proof-of-Report (POR#).',
+    };
+  };
+
+  const summary = getSummary();
+
   return (
     <div
       style={{
@@ -123,7 +145,7 @@ export default function Home() {
                     marginTop: 6,
                     padding: '8px 10px',
                     borderRadius: 8,
-                    border: '1px solid #d1d5db',
+                    border: '1px solid '#d1d5db',
                     width: 180,
                   }}
                   placeholder="8500"
@@ -219,6 +241,32 @@ export default function Home() {
             }}
           >
             <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Compliance analysis</h2>
+
+            {summary && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: 12,
+                  borderRadius: 10,
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  fontSize: 14,
+                  color: '#1d4ed8',
+                }}
+              >
+                <strong>CBSA summary:</strong>{' '}
+                CERS:{' '}
+                <strong>{summary.cersRequired ? 'Required' : 'Not required (demo logic)'}</strong>{' '}
+                · POR#: <strong>Required</strong> · Export permit:{' '}
+                <strong>Not checked in this demo</strong>
+                <br />
+                <span style={{ fontSize: 12, color: '#4b5563' }}>
+                  Based on CBSA export reporting thresholds and export documentation expectations
+                  for commercial goods (CERS guidance and POR# usage in CBSA export programs).
+                </span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 40, fontWeight: 800, color: '#16a34a' }}>
