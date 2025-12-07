@@ -357,6 +357,16 @@ function addCBSAGuide(doc, colors) {
 
   doc.moveDown(0.8);
   section(doc, colors, 'Key references (read online)');
+  doc.moveDown(0.5);
+doc.fontSize(9).font('Helvetica').fillColor(colors.neutral).text(
+  'Export permits are not assessed by this version of ExportGuard and are not included in this service tier. ' +
+    'If you believe your goods may require an export permit or export‑controls review, please contact us at ' +
+    'ask@rajbir.guru and we will be happy to work with you on a dedicated permit/compliance review.',
+  50,
+  doc.y,
+  { width: 495 }
+);
+
   bulletList(doc, colors, [
     'Exporters’ Guide to Reporting: https://www.cbsa-asfc.gc.ca/services/export/guide-eng.html',
     'CERS User Guide: https://www.cbsa-asfc.gc.ca/services/export/cers-guide-scde-eng.html',
