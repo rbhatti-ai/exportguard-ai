@@ -197,7 +197,7 @@ async function convertToCAD(amount, currency) {
     const url =
       `https://bcd-api-dca-ipa.cbsa-asfc.cloud-nuage.canada.ca/` +
       `exchange-rate-lambda/exchange-rates` +
-      `?fromCurrency=${encodeURIComponent(cur)}` +
+      `?fromCurrency=${encodeURIComponent(cur)}` +  // e.g. USD
       `&toCurrency=CAD` +
       `&startDate=${today}&endDate=${today}&limit=1`;
 
@@ -213,28 +213,28 @@ async function convertToCAD(amount, currency) {
 
     const json = await resp.json();
     const rates = json.ForeignExchangeRates || [];
-const first = rates[0];
+    const first = rates[0];
 
-const rateStr = first?.Rate;
-let rate = rateStr != null ? Number(rateStr) : NaN;
+    console.log(
+      'CBSA FX payload for',
+      cur,
+      '→CAD:',
+      JSON.stringify(first || json, null, 2)
+    );
 
-if (!rate || Number.isNaN(rate)) {
-  console.error('CBSA FX missing/invalid rate for', cur, 'payload:', json);
-  return {
-    valueCAD: numericAmount,
-    fxNote: `No valid FX rate for ${cur}→CAD; amount treated as CAD`,
-  };
-}
+    const rateStr = first?.Rate;
+    const rate = rateStr != null ? Number(rateStr) : NaN;
 
-// Temporary safeguard: if the rate is clearly too small, invert it.
-// You are currently seeing ~0.00893, which yields 12 CAD for 1350 USD,
-// so invert values below 0.5.
-if (rate < 0.5) {
-  rate = 1 / rate;
-}
+    if (!rate || Number.isNaN(rate)) {
+      console.error('CBSA FX missing/invalid rate for', cur, 'payload:', json);
+      return {
+        valueCAD: numericAmount,
+        fxNote: `No valid FX rate for ${cur}→CAD; amount treated as CAD`,
+      };
+    }
 
-const valueCAD = numericAmount * rate;
-
+    // Use rate directly as CAD per 1 unit of foreign currency.
+    const valueCAD = numericAmount * rate;
 
     return {
       valueCAD,
@@ -248,7 +248,6 @@ const valueCAD = numericAmount * rate;
     };
   }
 }
-
 
 // --- Main handler: parse form → OCR → CBSA logic ---
 export default async function handler(req, res) {
