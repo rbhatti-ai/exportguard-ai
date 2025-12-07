@@ -1,244 +1,457 @@
-import PDFDocument from 'pdfkit';
+// pages/api/export-report.js
+// Professional ExportGuard CBSA Compliance Report Generator
 
-export const config = {
-  api: {
-    responseType: 'stream',
-  },
-};
+import PDFDocument from 'pdfkit';
 
 export default function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const analysis = req.body; // you’re currently posting the whole result object
+
+  if (!analysis) {
+    return res.status(400).json({ error: 'Missing analysis data' });
+  }
+
   try {
-    const data = req.body;
+    const pdf = generateExportGuardReport(analysis);
 
-    // Create PDF document
-    const doc = new PDFDocument({
-      margin: 40,
-      size: 'Letter',
-    });
-
-    // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="ExportGuard-CBSA-Report.pdf"');
-
-    // Pipe PDF to response
-    doc.pipe(res);
-
-    // --- Header Section ---
-    doc.fontSize(10).text('GOVERNMENT OF CANADA / GOUVERNEMENT DU CANADA', { align: 'center' });
-    doc.fontSize(9).text('Canada Border Services Agency / Agence des services frontaliers du Canada', {
-      align: 'center',
-    });
-    doc.fontSize(9).text('(CBSA / ASFC)', { align: 'center' });
-    doc.moveTo(40, doc.y + 4).lineTo(555, doc.y + 4).stroke();
-
-    doc.moveDown(0.4);
-    doc.fontSize(14).font('Helvetica-Bold').text('EXPORT COMPLIANCE ASSESSMENT REPORT', {
-      align: 'center',
-    });
-    doc.fontSize(10).font('Helvetica').text('Prepared by ExportGuard AI | SinghLabs', {
-      align: 'center',
-    });
-
-    doc.moveDown(0.6);
-
-    // --- Report Metadata ---
-    doc.fontSize(10).font('Helvetica-Bold').text('REPORT DETAILS', { underline: true });
-    doc.moveDown(0.2);
-    doc.fontSize(9).font('Helvetica');
-    doc.text(`Report Generated: ${new Date().toISOString().split('T')[0]}`, { width: 500 });
-    doc.text(`Assessment Type: Canadian Export Reporting System (CERS) Compliance`, {
-      width: 500,
-    });
-    doc.text(
-      `Regulatory Framework: CBSA Memorandum D20-1-1 (Exporter Reporting), CERS User Guide`,
-      { width: 500 }
-    );
-    doc.text(`Compliance Score: ${data.complianceScore || 'N/A'}%`, { width: 500 });
-
-    doc.moveDown(0.4);
-
-    // --- Shipment Information Section ---
-    doc.fontSize(10).font('Helvetica-Bold').text('SECTION 1: SHIPMENT DETAILS', { underline: true });
-    doc.moveDown(0.2);
-    doc.fontSize(9).font('Helvetica');
-
-    const shipmentInfo = [
-      ['Item Description', 'HS Code', data.hsCode || 'Pending'],
-      ['Declared Value (CAD)', '', `$${(data.valueCAD || 0).toFixed(2)}`],
-      ['Destination Country', '', data.destination || 'Not provided'],
-      ['Country of Origin', '', data.origin || 'Not provided'],
-      ['Mode of Transport', '', data.mode || 'Not specified'],
-      ['Invoice Currency (Source)', '', data.valueSource?.sourceCurrency || 'N/A'],
-      [
-        'FX Conversion Note',
-        '',
-        data.valueSource?.fxNote || 'No currency conversion required',
-      ],
-    ];
-
-    doc.fontSize(9);
-    for (const row of shipmentInfo) {
-      if (row[1]) {
-        doc.text(`${row[0]}: ${row[2]}`, { width: 500 });
-      } else {
-        doc.text(`${row[0]}: ${row[2]}`, { width: 500 });
-      }
-    }
-
-    doc.moveDown(0.4);
-
-    // --- CERS Applicability Section ---
-    doc.fontSize(10).font('Helvetica-Bold').text('SECTION 2: CBSA EXPORT REPORTING REQUIREMENTS', {
-      underline: true,
-    });
-    doc.moveDown(0.2);
-    doc.fontSize(9).font('Helvetica');
-
-    const cersStatus = data.cersRequired ? 'REQUIRED' : 'NOT REQUIRED (Based on demo logic)';
-    const cersColor = data.cersRequired ? 'red' : 'green';
-
-    doc.text(
-      `Canadian Export Reporting System (CERS) Declaration: ${cersStatus}`,
-      { width: 500 }
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="ExportGuard-Report-${new Date()
+        .toISOString()
+        .split('T')[0]}.pdf"`
     );
 
-    doc.moveDown(0.2);
-    doc.fontSize(8).font('Helvetica').text(
-      'REGULATORY BASIS (CBSA Memorandum D20-1-1, Exporter Reporting):',
-      { underline: true }
-    );
-    doc.moveDown(0.1);
-    doc.fontSize(8).text(
-      `Non-restricted commercial goods valued at CAD 2,000 or more destined for countries other than the United States generally require an export declaration in CERS, or export using Air or Rail modes may trigger mandatory CERS reporting. [CBSA D20-1-1, Section: "Commercial goods valued at CAD 2,000 or more"] [CBSA Exporters' guide to reporting, "Determine if an export declaration and/or permit is required"]`,
-      { width: 460 }
-    );
-
-    doc.moveDown(0.3);
-    doc.fontSize(9).font('Helvetica-Bold').text('Proof-of-Report (POR#) Status:');
-    const porStatus = data.porRequired ? 'REQUIRED' : 'NOT REQUIRED';
-    doc.fontSize(9).font('Helvetica').text(`${porStatus}`, { width: 500 });
-    doc.moveDown(0.1);
-    doc.fontSize(8).text(
-      `When CERS is filed, the Canadian Border Services Agency issues a Proof-of-Report number (POR#). This number must be recorded on all shipping and commercial documentation for audit and carrier compliance. [CBSA D20-1-1, Section: "Proof of report"]`,
-      { width: 460 }
-    );
-
-    doc.moveDown(0.4);
-
-    // --- Compliance Issues Section ---
-    doc.fontSize(10).font('Helvetica-Bold').text('SECTION 3: COMPLIANCE FINDINGS', { underline: true });
-    doc.moveDown(0.2);
-
-    if (data.issues && data.issues.length > 0) {
-      data.issues.forEach((issue, idx) => {
-        doc.fontSize(9).font('Helvetica-Bold').text(`Finding ${idx + 1}: ${issue.title}`);
-        doc.fontSize(8).font('Helvetica').text(`Observation: ${issue.citation || 'N/A'}`, {
-          width: 460,
-        });
-        doc.moveDown(0.1);
-      });
-    } else {
-      doc.fontSize(9).text('No compliance issues identified.', { width: 500 });
-    }
-
-    doc.moveDown(0.4);
-
-    // --- Recommendations Section ---
-    doc.fontSize(10).font('Helvetica-Bold').text('SECTION 4: RECOMMENDED ACTIONS', {
-      underline: true,
-    });
-    doc.moveDown(0.2);
-    doc.fontSize(9).font('Helvetica');
-
-    const actions = [];
-    if (data.cersRequired) {
-      actions.push(
-        '1. File an export declaration in the CBSA Canadian Export Reporting System (CERS) portal at https://www.cbsa-asfc.gc.ca/services/export/portal-portail/menu-eng.html before shipping. Consult CBSA CERS User Guide for step-by-step instructions.'
-      );
-      actions.push(
-        '2. Record the Proof-of-Report (POR#) number issued by CBSA on all commercial invoices, bills of lading, and carrier documentation.'
-      );
-    }
-    if (!data.origin) {
-      actions.push(
-        '3. Add the country of origin for each product line to the commercial invoice and export declaration, as required by CBSA and international trading partners.'
-      );
-    }
-    actions.push(
-      '4. Retain all export documentation and CERS filings for a minimum of 6 years for CBSA audit purposes.'
-    );
-    actions.push(
-      `5. For complex goods, restricted items, or export permits: consult CBSA's Export Control List (ECL) and contact Global Affairs Canada for permit requirements.`
-    );
-
-    actions.forEach((action) => {
-      doc.fontSize(9).text(action, { width: 460 });
-      doc.moveDown(0.2);
-    });
-
-    doc.moveDown(0.3);
-
-    // --- Regulatory References Section ---
-    doc.fontSize(10).font('Helvetica-Bold').text('SECTION 5: REGULATORY REFERENCES', {
-      underline: true,
-    });
-    doc.moveDown(0.2);
-    doc.fontSize(8).font('Helvetica');
-
-    const references = [
-  'CBSA Memorandum D20-1-1: Exporter Reporting (https://www.cbsa-asfc.gc.ca/publications/dm-md/d20/d20-1-1-eng.html)',
-  "CBSA Exporters' Guide to Reporting (https://www.cbsa-asfc.gc.ca/services/export/guide-eng.html)",
-  'Canadian Export Reporting System (CERS) User Guide (https://www.cbsa-asfc.gc.ca/services/export/cers-guide-scde-eng.html)',
-  'CBSA Goods That Do Not Need an Export Declaration (https://www.cbsa-asfc.gc.ca/services/export/ndr-adr-eng.html)',
-  'Global Affairs Canada - Export Control List (https://www.international.gc.ca/controls-controles/)',
-];
-
-
-    references.forEach((ref, idx) => {
-      doc.text(`[${idx + 1}] ${ref}`, { width: 460 });
-    });
-
-    doc.moveDown(0.4);
-
-    // --- Disclaimer Section ---
-    doc.fontSize(9).font('Helvetica-Bold').text('IMPORTANT DISCLAIMER', { underline: true });
-    doc.moveDown(0.1);
-    doc.fontSize(8).font('Helvetica').text(
-      `This report is an automated assessment generated by ExportGuard AI, a product of SinghLabs. It is provided for informational purposes only and does not constitute legal or compliance advice. This report is NOT an official CBSA ruling and does not replace guidance from the Canada Border Services Agency or a licensed customs broker.
-
-Exporters are solely responsible for ensuring compliance with all applicable Canadian export regulations, including CERS filing requirements, export permits, and partner-country customs requirements. Always verify current CBSA rules and consult with CBSA directly or through a licensed broker before finalizing export transactions.
-
-Responsibility for accuracy of data: This analysis is based on information you provided (invoice values, destination, origin, mode). ExportGuard AI does not verify the accuracy of OCR extractions or manually entered data. Errors in underlying data will result in incorrect compliance assessments.
-
-Data Privacy: This report is for your use only. Do not share original invoices or sensitive commercial data through unsecured channels.`,
-      { width: 460 }
-    );
-
-    doc.moveDown(0.4);
-
-    // --- Footer ---
-    const pageHeight = doc.page.height;
-    const footerY = pageHeight - 40;
-
-    doc.moveTo(40, footerY).lineTo(555, footerY).stroke();
-    doc.fontSize(8).text('ExportGuard AI | Powered by SinghLabs', 40, footerY + 5, {
-      align: 'center',
-    });
-    doc.fontSize(8).text(
-      `Generated on ${new Date().toLocaleString()} | Confidential - For Internal Use Only`,
-      40,
-      footerY + 16,
-      { align: 'center' }
-    );
-
-    // Finalize PDF
-    doc.end();
-  } catch (err) {
-    console.error('PDF export error:', err);
-    res.status(500).json({ error: 'Could not generate PDF report' });
+    pdf.pipe(res);
+    pdf.end();
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 }
+
+function generateExportGuardReport(analysisData) {
+  const doc = new PDFDocument({
+    size: 'letter',
+    margin: 50,
+    bufferPages: true,
+  });
+
+  const colors = {
+    primary: '#1F3A4C',
+    accent: '#208E9F',
+    success: '#217D8D',
+    warning: '#D97706',
+    error: '#DC2626',
+    neutral: '#6B7280',
+    lightGray: '#F3F4F6',
+    border: '#E5E7EB',
+  };
+
+  // PAGE 1: COVER PAGE
+  addCoverPage(doc, colors);
+
+  // PAGE 2: DISCLAIMER
+  doc.addPage();
+  addDisclaimerPage(doc, colors);
+
+  // PAGE 3: EXECUTIVE SUMMARY
+  doc.addPage();
+  addExecutiveSummary(doc, colors, analysisData);
+
+  // PAGE 4: DETAILED ANALYSIS
+  doc.addPage();
+  addDetailedAnalysis(doc, colors, analysisData);
+
+  // PAGE 5: COMPLIANCE FINDINGS
+  doc.addPage();
+  addComplianceFindings(doc, colors, analysisData);
+
+  // PAGE 6: RECOMMENDATIONS
+  doc.addPage();
+  addRecommendations(doc, colors, analysisData);
+
+  // PAGE 7: COMPLIANCE CHECKLIST
+  doc.addPage();
+  addComplianceChecklist(doc, colors);
+
+  // PAGE 8: CBSA GUIDE
+  doc.addPage();
+  addCBSAGuide(doc, colors);
+
+  // PAGE 9: FORMS & RESOURCES
+  doc.addPage();
+  addFormsAndResources(doc, colors);
+
+  // PAGE 10: GLOSSARY
+  doc.addPage();
+  addGlossary(doc, colors);
+
+  // PAGE 11: RECORD RETENTION
+  doc.addPage();
+  addRecordRetention(doc, colors);
+
+  return doc;
+}
+
+// ---------- COVER PAGE ----------
+function addCoverPage(doc, colors) {
+  doc
+    .fontSize(36)
+    .font('Helvetica-Bold')
+    .fillColor(colors.primary)
+    .text('ExportGuard', 50, 100);
+
+  doc
+    .fontSize(14)
+    .font('Helvetica')
+    .fillColor(colors.accent)
+    .text('AI Export Compliance Workstation', 50, 145);
+
+  doc
+    .strokeColor(colors.accent)
+    .lineWidth(2)
+    .moveTo(50, 165)
+    .lineTo(545, 165)
+    .stroke();
+
+  doc
+    .fontSize(28)
+    .font('Helvetica-Bold')
+    .fillColor(colors.primary)
+    .text('Export Compliance Analysis Report', 50, 220, {
+      width: 495,
+      align: 'center',
+    });
+
+  doc
+    .fontSize(11)
+    .font('Helvetica')
+    .fillColor(colors.neutral)
+    .text(
+      `Report Date: ${new Date().toLocaleDateString('en-CA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })}`,
+      50,
+      280
+    );
+  doc.text('Report Type: CBSA Export Documentation Review', 50, 300);
+  doc.text('Status: Generated by ExportGuard AI System', 50, 320);
+
+  doc.rect(50, 360, 495, 120).fillAndStroke(colors.lightGray, colors.border);
+  doc
+    .fontSize(10)
+    .font('Helvetica-Bold')
+    .fillColor(colors.primary)
+    .text('Export Shipment Details', 60, 375);
+
+  doc.fontSize(9).font('Helvetica').fillColor(colors.neutral);
+  doc.text('Commodity: Commercial goods (see invoice for specifics)', 60, 395);
+  doc.text('Destination: [Per analysis]', 60, 412);
+  doc.text('Exporter Type: Small-to-Medium Business (SMB)', 60, 429);
+  doc.text('Reporting Method: CERS (Canadian Export Reporting System)', 60, 446);
+
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(colors.neutral)
+    .text(
+      'This report is generated for export compliance guidance and should be reviewed by qualified customs professionals.',
+      50,
+      520,
+      { width: 495, align: 'center' }
+    );
+  doc.text('© ExportGuard AI 2025 | Confidential Document', 50, 540, {
+    width: 495,
+    align: 'center',
+  });
+}
+
+// ---------- DISCLAIMER ----------
+function addDisclaimerPage(doc, colors) {
+  heading(doc, colors, 'Legal Disclaimer & Notice', 1);
+
+  section(doc, colors, 'Disclaimer of Liability', 2);
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(colors.neutral)
+    .text(
+      'This report is prepared by ExportGuard AI as a guidance document only and is not legal advice. Exporters must consult with qualified customs brokers, trade lawyers, or CBSA officials for authoritative guidance specific to their situation.',
+      50,
+      doc.y,
+      { width: 495 }
+    );
+
+  doc.moveDown(1);
+
+  section(doc, colors, 'Responsibility of Exporter', 2);
+  doc.text(
+    'You remain responsible for providing true, accurate, and complete information to the Canada Border Services Agency (CBSA) within prescribed timeframes under the Reporting of Exported Goods Regulations.',
+    50,
+    doc.y,
+    { width: 495 }
+  );
+
+  doc.moveDown(1);
+
+  section(doc, colors, 'CBSA Memoranda & Regulations', 2);
+  doc.text(
+    'Key CBSA and federal references that underpin this report include:',
+    50,
+    doc.y,
+    { width: 495 }
+  );
+  doc.moveDown(0.5);
+  bulletList(doc, colors, [
+    'Memorandum D20-1-1: Exporter Reporting (cbsa-asfc.gc.ca)',
+    'Reporting of Exported Goods Regulations (SOR/91-17)',
+    'Customs Act (R.S.C. 1985, c. C-52)',
+    'Canadian Export Reporting System (CERS) User Guide',
+  ]);
+
+  doc.moveDown(1);
+
+  section(doc, colors, 'Document Confidentiality', 2);
+  doc.text(
+    'This report contains confidential business information. Keep it secure and retain it for 6 years as required by Canadian export regulations.',
+    50,
+    doc.y,
+    { width: 495 }
+  );
+}
+
+// ---------- EXECUTIVE SUMMARY ----------
+function addExecutiveSummary(doc, colors, data) {
+  heading(doc, colors, 'Executive Summary', 1);
+
+  section(doc, colors, 'Overview', 2);
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(colors.neutral)
+    .text(
+      'This report summarizes ExportGuard’s analysis of your commercial invoice and export documentation against CBSA export reporting requirements.',
+      50,
+      doc.y,
+      { width: 495 }
+    );
+
+  doc.moveDown(1);
+
+  section(doc, colors, 'Key Findings', 2);
+
+  const boxTop = doc.y;
+  doc.rect(50, boxTop, 495, 70).fillAndStroke(colors.lightGray, colors.border);
+  doc
+    .fontSize(10)
+    .font('Helvetica-Bold')
+    .fillColor(colors.success)
+    .text('✓ Analysis Complete', 60, boxTop + 10);
+
+  doc.fontSize(9).font('Helvetica').fillColor(colors.neutral);
+  doc.text('Documentation Status: Requires review', 60, boxTop + 26);
+  doc.text('HS Code Classification: Pending confirmation', 60, boxTop + 41);
+  doc.text('Recommended Action: Submit export declaration in CERS', 60, boxTop + 56);
+
+  doc.y = boxTop + 90;
+  doc.moveDown(0.5);
+
+  section(doc, colors, 'Critical Next Steps', 2);
+  bulletList(doc, colors, [
+    'Verify all invoice details match packing list and shipment.',
+    'Classify goods using Canadian Export Classification (HS code).',
+    'Ensure Business Number (BN) and export RM program are active.',
+    'Submit export declaration via CERS within required timeframes.',
+    'Provide Proof of Report (POR) number to your carrier.',
+  ]);
+}
+
+// ---------- DETAILED ANALYSIS ----------
+function addDetailedAnalysis(doc, colors, data) {
+  heading(doc, colors, 'Detailed Compliance Analysis', 1);
+
+  section(doc, colors, 'Invoice & Documentation Review', 2);
+  doc
+    .fontSize(9)
+    .font('Helvetica')
+    .fillColor(colors.neutral)
+    .text(
+      'The following core data elements were checked in your invoice and supporting documents:',
+      50,
+      doc.y,
+      { width: 495 }
+    );
+
+  doc.moveDown(0.5);
+
+  const col1X = 50;
+  const col2X = 280;
+
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.primary);
+  doc.text('Field', col1X, doc.y);
+  doc.text('Status', col2X, doc.y);
+
+  doc
+    .strokeColor(colors.border)
+    .lineWidth(1)
+    .moveTo(col1X, doc.y + 15)
+    .lineTo(col1X + 445, doc.y + 15)
+    .stroke();
+
+  doc.fontSize(8).font('Helvetica').fillColor(colors.neutral);
+  let y = doc.y + 20;
+
+  const rows = [
+    ['Exporter information', '✓ Complete'],
+    ['Importer / consignee', '✓ Complete'],
+    ['Commodity description', '⚠ Clarify for HS coding'],
+    ['HS code classification', '⚠ Pending'],
+    ['Invoice value (CAD)', '✓ Confirmed'],
+    ['Country of origin', '✓ Confirmed'],
+    ['Destination country', '✓ Complete'],
+    ['Incoterms', '✓ Stated'],
+  ];
+
+  rows.forEach((row) => {
+    doc.text(row[0], col1X, y);
+    doc.text(row[1], col2X, y);
+    y += 15;
+  });
+
+  doc.y = y + 5;
+  doc.moveDown(0.5);
+
+  section(doc, colors, 'Export Declaration Requirements', 2);
+  doc.text(
+    'For most commercial exports over CAD $2,000 (non‑US destinations) or for controlled goods, an export declaration is mandatory.',
+    50,
+    doc.y,
+    { width: 495 }
+  );
+  doc.moveDown(0.5);
+  bulletList(doc, colors, [
+    'Export declaration via CERS is generally required.',
+    'Export permit may be required if goods fall under Export Control List.',
+    'Certificate of Origin may be needed to claim trade agreement benefits.',
+    'Proof of Report (POR) number must be obtained and given to carrier.',
+  ]);
+
+  doc.moveDown(0.5);
+  section(doc, colors, 'Mode of Transport & Timing', 2);
+
+  doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary);
+  const tx = 50;
+  const tw = 150;
+  doc.text('Mode', tx, doc.y);
+  doc.text('Timing', tx + tw, doc.y);
+  doc.text('Key documentation', tx + tw * 2, doc.y);
+  doc.moveDown(0.7);
+
+  doc
+    .strokeColor(colors.border)
+    .lineWidth(0.5)
+    .moveTo(tx, doc.y)
+    .lineTo(tx + 445, doc.y)
+    .stroke();
+
+  doc.fontSize(8).font('Helvetica').fillColor(colors.neutral);
+  const modes = [
+    { mode: 'Air', timing: '≥ 2 hours before loading', docs: 'CERS POR + invoice' },
+    { mode: 'Marine', timing: '≥ 48 hours before loading', docs: 'CERS POR + bill of lading' },
+    { mode: 'Rail', timing: '≥ 2 hours before loading', docs: 'CERS POR + rail waybill' },
+    { mode: 'Highway', timing: 'Before export', docs: 'CERS POR + invoice' },
+  ];
+
+  modes.forEach((m) => {
+    doc.text(m.mode, tx, doc.y);
+    doc.text(m.timing, tx + tw, doc.y);
+    doc.text(m.docs, tx + tw * 2, doc.y);
+    doc.moveDown(0.7);
+  });
+}
+
+// ---------- COMPLIANCE FINDINGS ----------
+function addComplianceFindings(doc, colors, data) {
+  heading(doc, colors, 'Compliance Status & Findings', 1);
+
+  section(doc, colors, 'Overall Compliance Score', 2);
+
+  const barWidth = 300;
+  const score = 78; // placeholder – can be derived from analysisData
+
+  const barTop = doc.y;
+  doc.rect(50, barTop, barWidth, 20).stroke();
+  doc.rect(50, barTop, (barWidth * score) / 100, 20).fill(colors.success);
+  doc
+    .fontSize(10)
+    .font('Helvetica-Bold')
+    .fillColor(colors.primary)
+    .text(`${score}% compliant (preliminary)`, 360, barTop + 2);
+
+  doc.y = barTop + 30;
+  doc.moveDown(0.5);
+
+  section(doc, colors, 'Findings by Category', 2);
+
+  const findings = [
+    {
+      category: 'Documentation',
+      status: 'Mostly complete',
+      items: ['Commercial invoice present', 'Packing list present', 'Values and currencies clear'],
+    },
+    {
+      category: 'Classification',
+      status: 'Needs review',
+      items: ['HS code not yet finalized', 'Origin confirmation recommended'],
+    },
+    {
+      category: 'CBSA registration',
+      status: 'To confirm',
+      items: ['BN and export RM program should be verified as active'],
+    },
+    {
+      category: 'Permits & controls',
+      status: 'No obvious red flags',
+      items: ['No restricted items detected based on description (preliminary only)'],
+    },
+  ];
+
+  findings.forEach((f) => {
+    const top = doc.y;
+    doc.rect(50, top, 495, 60).fillAndStroke(colors.lightGray, colors.border);
+    doc
+      .fontSize(9)
+      .font('Helvetica-Bold')
+      .fillColor(colors.primary)
+      .text(f.category, 60, top + 8);
+    doc
+      .fontSize(8)
+      .font('Helvetica')
+      .fillColor(colors.warning)
+      .text(f.status, 420, top + 8);
+
+    doc.fontSize(8).font('Helvetica').fillColor(colors.neutral);
+    let yy = top + 25;
+    f.items.forEach((item) => {
+      doc.text(`• ${item}`, 60, yy);
+      yy += 11;
+    });
+
+    doc.y = top + 70;
+    doc.moveDown(0.3);
+  });
+}
+
+// ---------- RECOMMENDATIONS ----------
+function addRecommendations(doc, colors, data) {
+  heading(doc, colors, 'Recommendations & Action Plan', 1);
+
+  section(doc, colors, 'Priority Actions (before export)', 2);
+
+  const actions =
