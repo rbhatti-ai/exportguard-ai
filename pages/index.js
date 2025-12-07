@@ -39,7 +39,6 @@ export default function Home() {
     }
   };
 
-  // Derive simple summary flags from issues
   const getSummary = () => {
     if (!result) return null;
 
@@ -54,7 +53,8 @@ export default function Home() {
       cersRequired,
       porRequired: true,
       permitChecked: false,
-      cersSource: 'CBSA export reporting thresholds (CERS guidance, CBSA export documentation rules).',
+      cersSource:
+        'CBSA export reporting thresholds (CERS guidance, CBSA export documentation rules).',
       porSource: 'CBSA export documentation requirements for Proof-of-Report (POR#).',
     };
   };
@@ -145,7 +145,7 @@ export default function Home() {
                     marginTop: 6,
                     padding: '8px 10px',
                     borderRadius: 8,
-                    border: '1px solid '#d1d5db',
+                    border: '1px solid #d1d5db',
                     width: 180,
                   }}
                   placeholder="8500"
@@ -262,7 +262,8 @@ export default function Home() {
                 <br />
                 <span style={{ fontSize: 12, color: '#4b5563' }}>
                   Based on CBSA export reporting thresholds and export documentation expectations
-                  for commercial goods (CERS guidance and POR# usage in CBSA export programs).
+                  for commercial goods in Canada (CERS guidance and POR# usage in CBSA export
+                  programs).
                 </span>
               </div>
             )}
