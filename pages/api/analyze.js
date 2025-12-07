@@ -125,6 +125,10 @@ async function callOcrService(fileBuffer) {
     }
 
     const doc = await docAiRes.json();
+console.log(
+  'DocAI entities:',
+  JSON.stringify(doc.document?.entities?.slice(0, 20) || [], null, 2)
+);
 
     const text = doc.document?.text || '';
     let total = null;
